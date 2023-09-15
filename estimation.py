@@ -25,8 +25,8 @@ class estimation_model:
             ow = self.output[2]
             oh = self.output[3]
 
-            MB = (ow * oh * pe_dim * b + pe_dim * pe_dim + ow * oh * pe_dim * b) * self.byte / self.bandwidth
-            CB = ceil(ow * oh / pe_num) * b + pe_dim - 1
+            DM = (ow * oh * pe_dim * b + pe_dim * pe_dim + ow * oh * pe_dim * b) * self.byte / self.bandwidth
+            EX = ceil(ow * oh / pe_num) * b + pe_dim - 1
             Iter = ceil((ic * k * k) / pe_dim) * ceil(oc / (pe_dim))
         
         if isinstance(self.layer, torch.nn.Linear):
@@ -34,11 +34,11 @@ class estimation_model:
             ic = self.input[1]
             oc = self.output[1]
 
-            MB = (pe_dim * b + pe_dim * pe_dim * pe_num + pe_dim * b) * self.byte / self.bandwidth
-            CB = b + pe_dim - 1
+            DM = (pe_dim * b + pe_dim * pe_dim * pe_num + pe_dim * b) * self.byte / self.bandwidth
+            EX = b + pe_dim - 1
             Iter = ceil(oc / (pe_dim * pe_num)) * ceil(ic / pe_dim)
         
-        return [MB, CB, Iter]
+        return [DM, EX, Iter]
     
     def shidiannao(self, pe_dim, pe_num):
         
@@ -53,8 +53,8 @@ class estimation_model:
             ow = self.output[2]
             oh = self.output[3]
 
-            MB = (pe_dim * pe_dim * pe_num * ic * b + k * k * ic + pe_dim * pe_dim * pe_num * b) * self.byte / self.bandwidth
-            CB = k * k * ic * b
+            DM = (pe_dim * pe_dim * pe_num * ic * b + k * k * ic + pe_dim * pe_dim * pe_num * b) * self.byte / self.bandwidth
+            EX = k * k * ic * b
             Iter = ceil(ceil(ow * oh * oc/ (pe_dim * pe_dim)) / pe_num)
 
         
@@ -63,11 +63,11 @@ class estimation_model:
             ic = self.input[1]
             oc = self.output[1]
 
-            MB = (b * ic + pe_dim * pe_dim * pe_num * ic + pe_dim * pe_dim * pe_num * b) * self.byte / self.bandwidth
-            CB = ic * b
+            DM = (b * ic + pe_dim * pe_dim * pe_num * ic + pe_dim * pe_dim * pe_num * b) * self.byte / self.bandwidth
+            EX = ic * b
             Iter = ceil(oc / (pe_dim * pe_dim * pe_num))
 
-        return [MB, CB, Iter]
+        return [DM, EX, Iter]
     
     def eyeriss(self, pe_dim, pe_num):
         
@@ -82,8 +82,8 @@ class estimation_model:
             ow = self.output[2]
             oh = self.output[3]
 
-            MB = ((pe_dim * k + ceil(pe_dim / k) * (pe_dim - 1))* b * pe_num + k * pe_dim + pe_dim * pe_num * b) * self.byte / self.bandwidth
-            CB = (k + pe_dim) * b
+            DM = ((pe_dim * k + ceil(pe_dim / k) * (pe_dim - 1))* b * pe_num + k * pe_dim + pe_dim * pe_num * b) * self.byte / self.bandwidth
+            EX = (k + pe_dim) * b
             Iter = ceil(oh / pe_dim) * ceil(ow / pe_num) * oc * ceil(ic * k / pe_dim)
 
         
@@ -92,11 +92,11 @@ class estimation_model:
             ic = self.input[1]
             oc = self.output[1]
 
-            MB = (pe_dim * b + pe_dim * pe_dim * pe_num + pe_dim * b) * self.byte / self.bandwidth
-            CB = b + pe_dim - 1
+            DM = (pe_dim * b + pe_dim * pe_dim * pe_num + pe_dim * b) * self.byte / self.bandwidth
+            EX = b + pe_dim - 1
             Iter = ceil(oc / (pe_dim * pe_num) * ceil(ic / pe_dim))
             
-        return [MB, CB, Iter]
+        return [DM, EX, Iter]
     
     def run_all(self, pe_dim, pe_num, plot, csv_file):
         tpu_res = self.tpu(pe_dim, pe_num)

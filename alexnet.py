@@ -25,8 +25,8 @@ def Alexnet(pe_dim, pe_num, model_name = 'vgg16', plot = True):
 
         with open(csv_file, 'a+', newline = '') as f:
             writer = csv.writer(f)
-            head = ['tpu_MB', 'tpu_CB', 'tpu_Iter', 'shidiannao_MB', 'shidiannao_CB', 'shidiannao_Iter', \
-                'eyeriss_MB', 'eyeriss_CB', 'eyeriss_Iter']
+            head = ['tpu_DM', 'tpu_EX', 'tpu_Iter', 'shidiannao_DM', 'shidiannao_EX', 'shidiannao_Iter', \
+                'eyeriss_DM', 'eyeriss_EX', 'eyeriss_Iter']
             writer.writerow(head)
         f.close()
 

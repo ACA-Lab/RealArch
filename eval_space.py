@@ -16,8 +16,8 @@ def read_csv_numpy(fname):
 
 
 def compute_buffer_use(esti_res, idx, bandwidth):
-    MB_idx = np.array([i * 3 for i in range(int(esti_res.shape[1] / 3))])
-    buffer_use = esti_res[idx, :][:, MB_idx] * bandwidth
+    DM_idx = np.array([i * 3 for i in range(int(esti_res.shape[1] / 3))])
+    buffer_use = esti_res[idx, :][:, DM_idx] * bandwidth
     return buffer_use
 
 def select_jobs(esti_res, bandwidth, job_num = 10):
@@ -28,12 +28,12 @@ def select_jobs(esti_res, bandwidth, job_num = 10):
         idx = sorted(np.random.choice(job_total_num, job_num, replace = False))
 
     buffer_use = compute_buffer_use(esti_res, idx, bandwidth)
-    MB_idx = np.array([i * 3 for i in range(int(esti_res.shape[1] / 3))])
-    CB_idx = MB_idx + 1
-    Iter_idx = CB_idx + 1
-    MB_CB_idx = sorted(np.concatenate([MB_idx, CB_idx]))
-    esti_res[:, MB_idx] = esti_res[:, MB_idx] * 256 / bandwidth
-    jobs = esti_res[idx, :][:, MB_CB_idx] * esti_res[idx, :][:, Iter_idx].repeat(2, axis = 1)
+    DM_idx = np.array([i * 3 for i in range(int(esti_res.shape[1] / 3))])
+    EX_idx = DM_idx + 1
+    Iter_idx = EX_idx + 1
+    DM_EX_idx = sorted(np.concatenate([DM_idx, EX_idx]))
+    esti_res[:, DM_idx] = esti_res[:, DM_idx] * 256 / bandwidth
+    jobs = esti_res[idx, :][:, DM_EX_idx] * esti_res[idx, :][:, Iter_idx].repeat(2, axis = 1)
 
     return jobs, buffer_use
 
@@ -226,10 +226,10 @@ def greedy_scheduler(net_work_list, batch_set, layer_num, buffer_size, bandwidth
     core_job = [[] for i in range(acc_num)]
     scheduler_list = []
 
-    MB_list_idx = np.arange(0, acc_num) * 2
-    CB_list_idx = MB_list_idx + 1
+    DM_list_idx = np.arange(0, acc_num) * 2
+    EX_list_idx = DM_list_idx + 1
 
-    greedy_key = jobs[:, MB_list_idx] + jobs[:, CB_list_idx]
+    greedy_key = jobs[:, DM_list_idx] + jobs[:, EX_list_idx]
     job_idx, acc_idx = np.unravel_index(np.argmin(greedy_key, axis=None), greedy_key.shape)
     core_job[acc_idx].append(job_idx)
     scheduler_list.append([job_idx, acc_idx])
@@ -263,23 +263,23 @@ def greedy_scheduler(net_work_list, batch_set, layer_num, buffer_size, bandwidth
             buffer_mask = buffer_use <= remain_buffer_array
             buffer_size_array = buffer_size.reshape(1, buffer_size.shape[0]).repeat(job_num, axis = 0)
 
-            less_MB_frame = jobs[:, MB_list_idx] + time_frame[0]
-            acc_start_latency = np.where(less_MB_frame <= acc_frame_array, 0, less_MB_frame - acc_frame_array)
-            less_CB_frame = acc_frame_array + acc_start_latency + jobs[:, CB_list_idx]
+            less_DM_frame = jobs[:, DM_list_idx] + time_frame[0]
+            acc_start_latency = np.where(less_DM_frame <= acc_frame_array, 0, less_DM_frame - acc_frame_array)
+            less_EX_frame = acc_frame_array + acc_start_latency + jobs[:, EX_list_idx]
             less_remain_buffer = remain_buffer_array - buffer_use
 
-            more_MB_frame = acc_frame_array + jobs[:, MB_list_idx]
-            more_CB_frame = more_MB_frame + jobs[:, CB_list_idx]
+            more_DM_frame = acc_frame_array + jobs[:, DM_list_idx]
+            more_EX_frame = more_DM_frame + jobs[:, EX_list_idx]
             more_remain_buffer = buffer_size_array - buffer_use
 
-            MB_frame = np.where(buffer_mask == True, less_MB_frame, more_MB_frame)
+            DM_frame = np.where(buffer_mask == True, less_DM_frame, more_DM_frame)
             remain_buffer_array = np.where(buffer_mask == True, less_remain_buffer, more_remain_buffer)
-            greedy_key = np.where(buffer_mask == True, less_CB_frame, more_CB_frame)
+            greedy_key = np.where(buffer_mask == True, less_EX_frame, more_EX_frame)
             job_idx, acc_idx = np.unravel_index(np.argmin(greedy_key, axis=None), greedy_key.shape)
             core_job[acc_idx].append(job_idx)
             scheduler_list.append([job_idx, acc_idx])
 
-            time_frame[0] = MB_frame[job_idx, acc_idx]
+            time_frame[0] = DM_frame[job_idx, acc_idx]
             time_frame[acc_idx + 1] = greedy_key[job_idx, acc_idx]
 
             remain_buffer[acc_idx] = remain_buffer_array[job_idx, acc_idx]
@@ -313,23 +313,23 @@ def core_job(jobs):
     core_job = [[] for i in range(acc_num)]
 
 
-    MB_list_idx = np.arange(0, acc_num) * 2
-    CB_list_idx = MB_list_idx + 1
+    DM_list_idx = np.arange(0, acc_num) * 2
+    EX_list_idx = DM_list_idx + 1
 
     all_latency = np.zeros([job_num, acc_num])
-    latency_MB = np.zeros([job_num, acc_num])
-    latency_CB = np.zeros([job_num, acc_num])
+    latency_DM = np.zeros([job_num, acc_num])
+    latency_EX = np.zeros([job_num, acc_num])
 
     while(all(jobs == float('Inf'))):
 
-        greedy_key = jobs[:, MB_list_idx] + jobs[:, CB_list_idx] + all_latency
+        greedy_key = jobs[:, DM_list_idx] + jobs[:, EX_list_idx] + all_latency
 
         job_idx, acc_idx = np.unravel_index(np.argmin(greedy_key, axis=None), greedy_key.shape)
         core_job[acc_idx].append(job_idx)
         job = jobs[job_idx, acc_idx*2:acc_idx*2+2]
-        latency_MB += job[0]
-        latency_CB[:, acc_num] += job[1]
-        all_latency = latency_MB + latency_CB
+        latency_DM += job[0]
+        latency_EX[:, acc_num] += job[1]
+        all_latency = latency_DM + latency_EX
         jobs[job_idx, :] = float('Inf')    
 
     return core_job
@@ -434,8 +434,8 @@ def reorder(jobs, core_job, buffer_use, buffer_size):
     assigned_job = 0
     scheduler_list = []
 
-    MB_list_idx = np.arange(0, acc_num) * 2
-    CB_list_idx = MB_list_idx + 1
+    DM_list_idx = np.arange(0, acc_num) * 2
+    EX_list_idx = DM_list_idx + 1
 
     covered_latency = np.full([job_num, acc_num], -1)
     for i, cj in enumerate(core_job):
@@ -517,30 +517,30 @@ def AI_MT(net_work_list, batch_set, layer_num, buffer_size, bandwidth, threshold
     jobs, buffer_use, net_work_list_this = pop_slot_num(net_work_list_this, bandwidth, slot_num)
 
     acc_num = buffer_size.shape[0]
-    ACL_CB = np.zeros(acc_num)
-    MB_list_idx = np.arange(0, acc_num) * 2
-    CB_list_idx = MB_list_idx + 1
+    ACL_EX = np.zeros(acc_num)
+    DM_list_idx = np.arange(0, acc_num) * 2
+    EX_list_idx = DM_list_idx + 1
     remain_buffer = copy.deepcopy(buffer_size)
     time_frame = np.full(acc_num + 1, float('Inf'))
     total_time_frame = 0
 
     finished_job = 0
     assigned_job = 0
-    MBs = jobs[:, MB_list_idx]
-    CBs = jobs[:, CB_list_idx]
-    min_CB_idx = np.argmin(CBs, axis = 1)
+    DMs = jobs[:, DM_list_idx]
+    EXs = jobs[:, EX_list_idx]
+    min_EX_idx = np.argmin(EXs, axis = 1)
         
 
     scheduler_list = []
     core_job = [[] for i in range(acc_num)]
     target = None
     for job_idx in range(job_num):
-        acc_idx = min_CB_idx[job_idx]
-        if MBs[job_idx, acc_idx] == float('Inf'):
+        acc_idx = min_EX_idx[job_idx]
+        if DMs[job_idx, acc_idx] == float('Inf'):
             continue
         if buffer_use[job_idx, acc_idx] < remain_buffer[acc_idx]:
-            if ACL_CB[acc_idx] < threshold[acc_idx]:
-                if MBs[job_idx, acc_idx] < CBs[job_idx, acc_idx]:
+            if ACL_EX[acc_idx] < threshold[acc_idx]:
+                if DMs[job_idx, acc_idx] < EXs[job_idx, acc_idx]:
                     target = [job_idx, acc_idx]
                     break
                 target = [job_idx, acc_idx]
@@ -550,7 +550,7 @@ def AI_MT(net_work_list, batch_set, layer_num, buffer_size, bandwidth, threshold
                 break
 
     scheduler_list.append(target)
-    ACL_CB[acc_idx] = max(ACL_CB[acc_idx] - MBs[job_idx, acc_idx], 0) + CBs[job_idx, acc_idx]
+    ACL_EX[acc_idx] = max(ACL_EX[acc_idx] - DMs[job_idx, acc_idx], 0) + EXs[job_idx, acc_idx]
     job = jobs[job_idx, acc_idx*2:acc_idx*2+2]
     time_frame[0] = job[0]
     time_frame[acc_idx + 1] = job[0] + job[1]
@@ -576,18 +576,18 @@ def AI_MT(net_work_list, batch_set, layer_num, buffer_size, bandwidth, threshold
             break
 
         if min_idx == 0:
-            MBs = jobs[:, MB_list_idx]
-            CBs = jobs[:, CB_list_idx]
+            DMs = jobs[:, DM_list_idx]
+            EXs = jobs[:, EX_list_idx]
 
-            min_CB_idx = np.argmin(CBs, axis = 1)
+            min_EX_idx = np.argmin(EXs, axis = 1)
 
             target = None
             for job_idx in range(job_num):
-                acc_idx = min_CB_idx[job_idx]
-                if MBs[job_idx, acc_idx] == float('Inf'):
+                acc_idx = min_EX_idx[job_idx]
+                if DMs[job_idx, acc_idx] == float('Inf'):
                     continue
-                if ACL_CB[acc_idx] < threshold[acc_idx]:
-                    if MBs[job_idx, acc_idx] < CBs[job_idx, acc_idx]:
+                if ACL_EX[acc_idx] < threshold[acc_idx]:
+                    if DMs[job_idx, acc_idx] < EXs[job_idx, acc_idx]:
                         target = [job_idx, acc_idx]
                         break
                 else:
@@ -604,7 +604,7 @@ def AI_MT(net_work_list, batch_set, layer_num, buffer_size, bandwidth, threshold
 
             if buffer_use[job_idx, acc_idx] <= remain_buffer[acc_idx]:
                 time_frame[0] += job[0]
-                ACL_CB[acc_idx] = max(ACL_CB[acc_idx] - MBs[job_idx, acc_idx], 0) + CBs[job_idx, acc_idx]
+                ACL_EX[acc_idx] = max(ACL_EX[acc_idx] - DMs[job_idx, acc_idx], 0) + EXs[job_idx, acc_idx]
                 if time_frame[acc_idx + 1] == float('Inf'):
                     time_frame[acc_idx + 1] = time_frame[0] + job[1]
                 else:
@@ -612,7 +612,7 @@ def AI_MT(net_work_list, batch_set, layer_num, buffer_size, bandwidth, threshold
                     time_frame[acc_idx + 1] += acc_start_latency + job[1]
                 remain_buffer[acc_idx] -= buffer_use[job_idx, acc_idx]
             else:
-                ACL_CB[acc_idx] = CBs[job_idx, acc_idx]
+                ACL_EX[acc_idx] = EXs[job_idx, acc_idx]
                 time_frame[0] = time_frame[acc_idx + 1] + job[0]
                 time_frame[acc_idx + 1] = time_frame[0] + job[1]
                 
